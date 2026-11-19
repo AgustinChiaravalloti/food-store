@@ -1,0 +1,270 @@
+@base = http://localhost:8000/api/v1
+
+# Correr en orden, de arriba hacia abajo.
+# Requisitos: seed.py ejecutado y el backend levantado.
+
+######################## SIN SESIÓN ########################
+
+### 1. Sin sesión → 401
+GET {{base}}/categorias/
+
+### 2. Registro → 201 (la primera vez; si se vuelve a correr el archivo, da 409)
+POST {{base}}/auth/register
+Content-Type: application/json
+
+{
+  "nombre": "Cliente",
+  "apellido": "Prueba",
+  "email": "cliente@test.com",
+  "celular": "1122334455",
+  "password": "cliente123"
+}
+
+### 3. Registro con email repetido → 409
+POST {{base}}/auth/register
+Content-Type: application/json
+
+{
+  "nombre": "Otro",
+  "apellido": "Cliente",
+  "email": "CLIENTE@test.com",
+  "password": "cliente123"
+}
+
+### 4. Registro inválido (email mal formado y contraseña corta) → 422
+POST {{base}}/auth/register
+Content-Type: application/json
+
+{
+  "nombre": "X",
+  "apellido": "Y",
+  "email": "no-es-un-email",
+  "password": "corta"
+}
+
+### 5. Login con contraseña incorrecta → 401 "Credenciales incorrectas"
+POST {{base}}/auth/token
+Content-Type: application/x-www-form-urlencoded
+
+username=cliente@test.com&password=incorrecta
+
+######################## COMO ADMIN ########################
+
+### 6. Login admin → 200 y Set-Cookie access_token (HttpOnly)
+POST {{base}}/auth/token
+Content-Type: application/x-www-form-urlencoded
+
+username=admin@foodstore.com&password=Admin1234!
+
+### 7. /me → 200, roles ["admin"]
+# @name admin
+GET {{base}}/auth/me
+
+### 8. Crear categoría → 201
+# @name categoria
+POST {{base}}/categorias/
+Content-Type: application/json
+
+{
+  "nombre": "Pizzas {{$timestamp}}",
+  "descripcion": "Categoría de prueba"
+}
+
+### 9. Crear producto → 201
+# @name producto
+POST {{base}}/productos/
+Content-Type: application/json
+
+{
+  "nombre": "Muzzarella",
+  "descripcion": "Pizza de prueba",
+  "precio_base": 8500,
+  "imagenes_url": [],
+  "disponible": true
+}
+
+### 10. Asociar categoría como principal → 201, con es_principal true
+POST {{base}}/productos/{{producto.response.body.$.id}}/categorias
+Content-Type: application/json
+
+{
+  "categoria_id": {{categoria.response.body.$.id}},
+  "es_principal": true
+}
+
+### 11. Asociar la misma categoría otra vez → 409
+POST {{base}}/productos/{{producto.response.body.$.id}}/categorias
+Content-Type: application/json
+
+{
+  "categoria_id": {{categoria.response.body.$.id}}
+}
+
+### 12. Catálogo de roles → 200 (admin y user)
+GET {{base}}/roles/
+
+### 13. Escritura sobre un catálogo → 405 Method Not Allowed
+POST {{base}}/roles/
+Content-Type: application/json
+
+{
+  "nombre": "superadmin"
+}
+
+### 14. Catálogo de estados → 200, los 6 en orden
+GET {{base}}/estados-pedido/
+
+### 15. Listado de usuarios (admin) → 200, incluye "activo"
+GET {{base}}/auth/admin/usuarios
+
+######################## COMO CLIENTE (user) ########################
+
+### 16. Login cliente → 200 (la cookie reemplaza a la del admin)
+POST {{base}}/auth/token
+Content-Type: application/x-www-form-urlencoded
+
+username=cliente@test.com&password=cliente123
+
+### 17. /me → 200, roles ["user"]
+# @name cliente
+GET {{base}}/auth/me
+
+### 18. Lectura del catálogo → 200
+GET {{base}}/productos/
+
+### 19. Crear categoría como user → 403
+POST {{base}}/categorias/
+Content-Type: application/json
+
+{
+  "nombre": "No debería crearse"
+}
+
+### 20. Eliminar producto como user → 403
+DELETE {{base}}/productos/{{producto.response.body.$.id}}
+
+### 21. Ruta de admin como user → 403
+GET {{base}}/auth/admin/usuarios
+
+### 22. Crear pedido → 201. El usuario_id 999 se ignora: se toma de la sesión
+# @name pedido
+POST {{base}}/pedidos/
+Content-Type: application/json
+
+{
+  "usuario_id": 999,
+  "detalles": [
+    { "producto_id": {{producto.response.body.$.id}}, "cantidad": 2 }
+  ]
+}
+
+### 23. Mis pedidos → 200, solo los del cliente
+GET {{base}}/pedidos/
+
+### 24. Cambiar estado como user → 403
+PUT {{base}}/pedidos/{{pedido.response.body.$.id}}
+Content-Type: application/json
+
+{
+  "estado_codigo": "CONFIRMADO"
+}
+
+######################## OTRA VEZ COMO ADMIN ########################
+
+### 25. Login admin → 200
+POST {{base}}/auth/token
+Content-Type: application/x-www-form-urlencoded
+
+username=admin@foodstore.com&password=Admin1234!
+
+### 26. Todos los pedidos → 200, incluye el del cliente
+GET {{base}}/pedidos/
+
+### 27. Cambiar estado → 200
+PUT {{base}}/pedidos/{{pedido.response.body.$.id}}
+Content-Type: application/json
+
+{
+  "estado_codigo": "EN_PREP"
+}
+
+### 28. Estado inexistente → 404
+PUT {{base}}/pedidos/{{pedido.response.body.$.id}}
+Content-Type: application/json
+
+{
+  "estado_codigo": "VOLANDO"
+}
+
+### 29. Pasar a un estado terminal → 200
+PUT {{base}}/pedidos/{{pedido.response.body.$.id}}
+Content-Type: application/json
+
+{
+  "estado_codigo": "ENTREGADO"
+}
+
+### 30. Cambiar un pedido terminal → 409
+PUT {{base}}/pedidos/{{pedido.response.body.$.id}}
+Content-Type: application/json
+
+{
+  "estado_codigo": "CONFIRMADO"
+}
+
+### 31. Desactivar al cliente → 200, "activo": false
+POST {{base}}/auth/admin/usuarios/{{cliente.response.body.$.id}}/desactivar
+
+### 32. Desactivarse a sí mismo → 400
+POST {{base}}/auth/admin/usuarios/{{admin.response.body.$.id}}/desactivar
+
+### 33. Desactivar un usuario inexistente → 404
+POST {{base}}/auth/admin/usuarios/999999/desactivar
+
+### 34. Login del cliente desactivado → 400 "Cuenta de usuario desactivada"
+# Falla, así que no pisa la cookie del admin.
+POST {{base}}/auth/token
+Content-Type: application/x-www-form-urlencoded
+
+username=cliente@test.com&password=cliente123
+
+### 35. Reactivar al cliente → 200, "activo": true
+POST {{base}}/auth/admin/usuarios/{{cliente.response.body.$.id}}/activar
+
+######################## BORRADO LÓGICO ########################
+
+### 36. Eliminar categoría → 204
+DELETE {{base}}/categorias/{{categoria.response.body.$.id}}
+
+### 37. Categoría eliminada → 404
+GET {{base}}/categorias/{{categoria.response.body.$.id}}
+
+### 38. El producto ya no muestra la categoría eliminada → 200, lista vacía
+GET {{base}}/productos/{{producto.response.body.$.id}}/categorias
+
+### 39. Eliminar producto incluido en un pedido → 204 (antes daba 409)
+DELETE {{base}}/productos/{{producto.response.body.$.id}}
+
+### 40. El pedido sigue intacto → 200, con su detalle
+GET {{base}}/pedidos/{{pedido.response.body.$.id}}
+
+### 41. Pedir un producto eliminado → 404
+POST {{base}}/pedidos/
+Content-Type: application/json
+
+{
+  "detalles": [
+    { "producto_id": {{producto.response.body.$.id}}, "cantidad": 1 }
+  ]
+}
+
+######################## CIERRE DE SESIÓN ########################
+
+### 42. Logout → 200, Set-Cookie borra access_token
+POST {{base}}/auth/logout
+
+### 43. Después del logout → 401
+GET {{base}}/auth/me
+
+### Listado de productos con sus categorías → 200
+GET {{base}}/productos/

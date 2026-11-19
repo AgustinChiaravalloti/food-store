@@ -1,0 +1,198 @@
+@baseUrl = http://localhost:8000
+
+#############################################
+#               CATEGORÍAS
+#############################################
+
+### Listar categorías
+GET {{baseUrl}}/categorias/
+
+### Crear categoría A
+# @name crearCategoriaA
+POST {{baseUrl}}/categorias/
+Content-Type: application/json
+
+{
+  "nombre": "Postres",
+  "descripcion": "Helados, tortas y dulces artesanales"
+}
+
+### Crear categoría B
+# @name crearCategoriaB
+POST {{baseUrl}}/categorias/
+Content-Type: application/json
+
+{
+  "nombre": "Entradas",
+  "descripcion": "Empanadas, medialunas y snacks para compartir"
+}
+
+### Obtener categoría A por id
+GET {{baseUrl}}/categorias/{{crearCategoriaA.response.body.id}}
+
+### Editar categoría A
+PUT {{baseUrl}}/categorias/{{crearCategoriaA.response.body.id}}
+Content-Type: application/json
+
+{
+  "nombre": "Postres",
+  "descripcion": "Helados, tortas, flanes y dulces artesanales"
+}
+
+### Error 409: nombre repetido (distinto en mayúsculas)
+POST {{baseUrl}}/categorias/
+Content-Type: application/json
+
+{
+  "nombre": "postres",
+  "descripcion": "Duplicada"
+}
+
+### Error 422: nombre vacío
+POST {{baseUrl}}/categorias/
+Content-Type: application/json
+
+{
+  "nombre": "   ",
+  "descripcion": "Sin nombre"
+}
+
+### Error 404: categoría inexistente
+GET {{baseUrl}}/categorias/999999
+
+
+#############################################
+#               PRODUCTOS
+#############################################
+
+### Crear producto completo
+# @name crearProducto
+POST {{baseUrl}}/productos/
+Content-Type: application/json
+
+{
+  "nombre": "Torta Oreo",
+  "descripcion": "Torta de chocolate con crema y galletitas Oreo",
+  "precio_base": 1500.50,
+  "imagenes_url": [
+    "https://ejemplo.com/torta-oreo-1.jpg",
+    "https://ejemplo.com/torta-oreo-2.jpg"
+  ],
+  "disponible": true
+}
+
+### Crear producto solo con campos obligatorios (imagenes_url y disponible por defecto)
+# @name crearProductoSimple
+POST {{baseUrl}}/productos/
+Content-Type: application/json
+
+{
+  "nombre": "Empanada de carne",
+  "descripcion": "Empanada criolla al horno",
+  "precio_base": 800
+}
+
+### Listar productos
+GET {{baseUrl}}/productos/
+
+### Obtener producto por id
+GET {{baseUrl}}/productos/{{crearProducto.response.body.id}}
+
+### Editar producto
+PUT {{baseUrl}}/productos/{{crearProducto.response.body.id}}
+Content-Type: application/json
+
+{
+  "nombre": "Torta Oreo",
+  "descripcion": "Torta de chocolate con crema y galletitas Oreo",
+  "precio_base": 1750.00,
+  "imagenes_url": ["https://ejemplo.com/torta-oreo-1.jpg"],
+  "disponible": false
+}
+
+### Error 422: precio negativo
+POST {{baseUrl}}/productos/
+Content-Type: application/json
+
+{
+  "nombre": "Producto con precio negativo",
+  "descripcion": "No debería crearse",
+  "precio_base": -100
+}
+
+### Error 404: producto inexistente
+GET {{baseUrl}}/productos/999999
+
+
+#############################################
+#        RELACIÓN PRODUCTO - CATEGORÍA
+#############################################
+
+### Asociar producto con categoría A
+POST {{baseUrl}}/productos/{{crearProducto.response.body.id}}/categorias
+Content-Type: application/json
+
+{
+  "categoria_id": {{crearCategoriaA.response.body.id}}
+}
+
+### Asociar producto con categoría B
+POST {{baseUrl}}/productos/{{crearProducto.response.body.id}}/categorias
+Content-Type: application/json
+
+{
+  "categoria_id": {{crearCategoriaB.response.body.id}}
+}
+
+### Listar categorías del producto
+GET {{baseUrl}}/productos/{{crearProducto.response.body.id}}/categorias
+
+### Error 409: asociación repetida
+POST {{baseUrl}}/productos/{{crearProducto.response.body.id}}/categorias
+Content-Type: application/json
+
+{
+  "categoria_id": {{crearCategoriaA.response.body.id}}
+}
+
+### Error 404: asociar con categoría inexistente
+POST {{baseUrl}}/productos/{{crearProducto.response.body.id}}/categorias
+Content-Type: application/json
+
+{
+  "categoria_id": 999999
+}
+
+### Desasociar categoría B del producto
+DELETE {{baseUrl}}/productos/{{crearProducto.response.body.id}}/categorias/{{crearCategoriaB.response.body.id}}
+
+### Error 404: desasociar una relación que ya no existe
+DELETE {{baseUrl}}/productos/{{crearProducto.response.body.id}}/categorias/{{crearCategoriaB.response.body.id}}
+
+
+#############################################
+#   CASCADA: borrar categoría asociada
+#############################################
+
+### Borrar categoría A (está asociada al producto)
+DELETE {{baseUrl}}/categorias/{{crearCategoriaA.response.body.id}}
+
+### El producto sigue existiendo, pero ya no tiene la categoría A
+GET {{baseUrl}}/productos/{{crearProducto.response.body.id}}/categorias
+
+
+#############################################
+#   LIMPIEZA (deja la base como estaba)
+#############################################
+
+### Borrar categoría B
+DELETE {{baseUrl}}/categorias/{{crearCategoriaB.response.body.id}}
+
+### Borrar producto completo
+DELETE {{baseUrl}}/productos/{{crearProducto.response.body.id}}
+
+### Borrar producto simple
+DELETE {{baseUrl}}/productos/{{crearProductoSimple.response.body.id}}
+
+### Verificar que el producto ya no existe
+GET {{baseUrl}}/productos/{{crearProducto.response.body.id}}

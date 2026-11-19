@@ -1,0 +1,147 @@
+@baseUrl = http://localhost:8000
+
+###############################################
+# PREPARACIÓN: productos para usar en los pedidos
+###############################################
+
+### 0.1 Crear producto A
+# @name productoA
+POST {{baseUrl}}/productos/
+Content-Type: application/json
+
+{
+  "nombre": "Pizza muzzarella",
+  "descripcion": "Pizza grande de muzzarella",
+  "precio_base": 1500.50,
+  "imagenes_url": [],
+  "disponible": true
+}
+
+### 0.2 Crear producto B
+# @name productoB
+POST {{baseUrl}}/productos/
+Content-Type: application/json
+
+{
+  "nombre": "Empanada de carne",
+  "descripcion": "Empanada al horno",
+  "precio_base": 2300,
+  "imagenes_url": [],
+  "disponible": true
+}
+
+###############################################
+# CASOS EXITOSOS
+###############################################
+
+### 1. Crear pedido válido (2 x A + 1 x B) → 201, total 5301.00
+# @name crearPedido
+POST {{baseUrl}}/pedidos/
+Content-Type: application/json
+
+{
+  "detalles": [
+    { "producto_id": {{productoA.response.body.$.id}}, "cantidad": 2 },
+    { "producto_id": {{productoB.response.body.$.id}}, "cantidad": 1 }
+  ]
+}
+
+### 2. Listar pedidos → 200
+GET {{baseUrl}}/pedidos/
+
+### 3. Obtener el pedido con sus detalles → 200
+GET {{baseUrl}}/pedidos/{{crearPedido.response.body.$.id}}
+
+### 4. Actualizar estado a CONFIRMADO → 200
+PUT {{baseUrl}}/pedidos/{{crearPedido.response.body.$.id}}
+Content-Type: application/json
+
+{
+  "estado": "CONFIRMADO"
+}
+
+###############################################
+# ERRORES DE VALIDACIÓN (422)
+###############################################
+
+### 5. Pedido sin detalles → 422
+POST {{baseUrl}}/pedidos/
+Content-Type: application/json
+
+{
+  "detalles": []
+}
+
+### 6. Cantidad menor que 1 → 422
+POST {{baseUrl}}/pedidos/
+Content-Type: application/json
+
+{
+  "detalles": [
+    { "producto_id": {{productoA.response.body.$.id}}, "cantidad": 0 }
+  ]
+}
+
+### 7. Producto repetido en dos detalles → 422
+POST {{baseUrl}}/pedidos/
+Content-Type: application/json
+
+{
+  "detalles": [
+    { "producto_id": {{productoA.response.body.$.id}}, "cantidad": 1 },
+    { "producto_id": {{productoA.response.body.$.id}}, "cantidad": 3 }
+  ]
+}
+
+### 8. Estado fuera de los permitidos → 422
+PUT {{baseUrl}}/pedidos/{{crearPedido.response.body.$.id}}
+Content-Type: application/json
+
+{
+  "estado": "VOLANDO"
+}
+
+###############################################
+# NO ENCONTRADOS (404) Y ROLLBACK
+###############################################
+
+### 9. Producto inexistente → 404 (y no se guarda nada)
+POST {{baseUrl}}/pedidos/
+Content-Type: application/json
+
+{
+  "detalles": [
+    { "producto_id": {{productoA.response.body.$.id}}, "cantidad": 1 },
+    { "producto_id": 999999, "cantidad": 1 }
+  ]
+}
+
+### 10. Comprobar el rollback: tiene que haber el mismo número de pedidos que en el caso 2
+GET {{baseUrl}}/pedidos/
+
+### 11. Pedido inexistente → 404
+GET {{baseUrl}}/pedidos/999999
+
+###############################################
+# BORRADO LÓGICO
+###############################################
+
+### 12. Eliminar el pedido → 204
+DELETE {{baseUrl}}/pedidos/{{crearPedido.response.body.$.id}}
+
+### 13. Obtener el pedido eliminado → 404
+GET {{baseUrl}}/pedidos/{{crearPedido.response.body.$.id}}
+
+### 14. Actualizar el pedido eliminado → 404
+PUT {{baseUrl}}/pedidos/{{crearPedido.response.body.$.id}}
+Content-Type: application/json
+
+{
+  "estado": "CANCELADO"
+}
+
+### 15. Eliminar de nuevo → 404
+DELETE {{baseUrl}}/pedidos/{{crearPedido.response.body.$.id}}
+
+### 16. Listar: el pedido eliminado ya no aparece → 200
+GET {{baseUrl}}/pedidos/

@@ -1,0 +1,15 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Variables de entorno reales (los .env.example sí se suben)
+.env
+
+# Base de datos local
+*.db
+
+# Frontend
+node_modules/
+dist/
