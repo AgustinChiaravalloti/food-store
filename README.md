@@ -11,7 +11,7 @@ Sistema de pedidos de comida para la materia Programación 4 (UTN). Incluye una 
 
 ## Repositorio
 
-[LINK DEL REPOSITORIO]
+https://github.com/AgustinChiaravalloti/food-store
 
 ## Requisitos
 
